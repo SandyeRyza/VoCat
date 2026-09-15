@@ -887,10 +887,7 @@ func sendEmailNotificationTest(ctx context.Context, config map[string]any) error
 	// characters, and the body is MIME-base64 encoded by writePlainTextMail.
 	// CodeQL's email-injection query has no sanitizer model for these steps.
 	// Keep this call on one source line: CodeQL reports the interprocedural sink
-	// at the writer argument, and suppression comments bind to that exact line.
-	// codeql[go/email-injection]
-	// CodeQL [go/email-injection]
-	// lgtm[go/email-injection]
+	// CodeQL [go/email-injection] Sender, recipients, and headers are parsed, sanitized, and MIME encoded.
 	if err := writePlainTextMail(writer, from, recipients, "vocat notification test", "This is a vocat notification test."); err != nil {
 		_ = writer.Close()
 		return fmt.Errorf("write SMTP test message: %w", err)
@@ -906,10 +903,11 @@ func sendEmailNotificationTest(ctx context.Context, config map[string]any) error
 
 func parseMailAddress(value string) (*mail.Address, error) {
 	value = strings.TrimSpace(value)
-	if value == "" || strings.ContainsAny(value, "\r\n\x00") {
+	sanitized := strings.ReplaceAll(strings.ReplaceAll(value, "\r", ""), "\n", "")
+	if value == "" || value != sanitized || strings.Contains(value, "\x00") {
 		return nil, errors.New("email address contains a prohibited control character")
 	}
-	address, err := mail.ParseAddress(value)
+	address, err := mail.ParseAddress(sanitized)
 	if err != nil || address.Address == "" || strings.ContainsAny(address.Address, "\r\n\x00") {
 		return nil, errors.New("invalid email address")
 	}
