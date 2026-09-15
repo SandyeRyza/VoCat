@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net"
 	"net/http"
 	"net/mail"
@@ -923,7 +924,8 @@ func formatMailAddress(address *mail.Address) string {
 	if address.Name == "" {
 		return address.Address
 	}
-	return (&mail.Address{Name: address.Name, Address: address.Address}).String()
+	encodedName := mime.QEncoding.Encode("UTF-8", address.Name)
+	return (&mail.Address{Name: encodedName, Address: address.Address}).String()
 }
 
 func restrictedHTTPClient(
