@@ -30,6 +30,15 @@ type automaticTaskNotification struct {
 	Run   store.AutomaticTaskRun
 }
 
+// DetailText 返回不含重复首行标题的任务正文，不改变其他渠道使用的 Text。
+func (value automaticTaskNotification) DetailText() string {
+	lines := strings.SplitN(value.Text, "\n", 2)
+	if len(lines) == 2 && strings.TrimSpace(lines[0]) == strings.TrimSpace(value.Title) {
+		return lines[1]
+	}
+	return value.Text
+}
+
 func (s *Server) notifyAutomaticTask(ctx context.Context, task store.AutomaticTask, run store.AutomaticTaskRun) {
 	ctx = s.notificationDestinationContext(ctx)
 	deviceLabel := task.DeviceID
@@ -57,7 +66,7 @@ func (s *Server) notifyAutomaticTask(ctx context.Context, task store.AutomaticTa
 		}, "\n"),
 		Time: run.FinishedAt, Task: task, Run: run,
 	}
-	for _, channel := range []string{"telegram", "bark", "email", "pushplus", "webhook", "wecom", "lark"} {
+	for _, channel := range notificationChannels {
 		setting, err := s.store.NotificationSetting(ctx, channel)
 		if errors.Is(err, store.ErrNotFound) || (err == nil && !setting.Enabled) {
 			continue
@@ -77,7 +86,11 @@ func (s *Server) notifyAutomaticTask(ctx context.Context, task store.AutomaticTa
 	}
 }
 
+// sendAutomaticTaskNotification 按渠道发送任务结果，仅 MeoW 使用无标题正文。
 func sendAutomaticTaskNotification(ctx context.Context, channel string, config map[string]any, message automaticTaskNotification) error {
+	if channel == "meow" {
+		return meowNotificationSender(ctx, config, message.Title, message.DetailText())
+	}
 	switch channel {
 	case "telegram":
 		return sendTelegramTextNotification(ctx, config, message.Text)

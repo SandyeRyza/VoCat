@@ -55,7 +55,7 @@ func smsNotificationRetryDelay(consecutiveFailures int) time.Duration {
 	return delay
 }
 
-var smsOnlyNotificationChannels = []string{"bark", "email", "pushplus", "webhook", "wecom", "lark"}
+var smsOnlyNotificationChannels = []string{"bark", "email", "pushplus", "webhook", "wecom", "lark", "meow"}
 
 type smsNotification struct {
 	DeviceID    string
@@ -225,6 +225,9 @@ func (s *Server) smsNotificationConfig(ctx context.Context, channel string) (map
 }
 
 func validateSMSNotificationConfig(channel string, config map[string]any) error {
+	if channel == "meow" {
+		return validateMeowNotificationConfig(config)
+	}
 	switch channel {
 	case "bark", "email", "webhook", "wecom", "lark":
 		if err := validateNotificationTestConfig(channel, config); err != nil {
@@ -275,7 +278,11 @@ func (s *Server) logSMSNotificationError(channel string, err error) {
 	}
 }
 
+// sendSMSNotification 按渠道发送短信，MeoW 与其他独立标题渠道复用 DetailText。
 func sendSMSNotification(ctx context.Context, channel string, config map[string]any, message smsNotification) error {
+	if channel == "meow" {
+		return meowNotificationSender(ctx, config, "收到新短信", message.DetailText())
+	}
 	switch channel {
 	case "bark":
 		return sendBarkSMSNotification(ctx, config, message)
